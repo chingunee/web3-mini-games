@@ -12,3 +12,4 @@ npx hardhat node
 npx hardhat run scripts/deploy.js
 ```
 # web3-mini-games
+# web3-mini-games
