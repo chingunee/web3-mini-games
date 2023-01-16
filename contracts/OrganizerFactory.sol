@@ -31,7 +31,7 @@ contract OrganizerFactory is AccessControl {
   function createOrganizer(
     string memory _username,
     string memory _email,
-    uint _phone_number
+    string memory _phone_number
   ) external {
     require(organizerHasNft[msg.sender] == false, "Acount has already organizerNFT.");
 

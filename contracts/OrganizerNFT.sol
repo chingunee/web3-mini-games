@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
@@ -28,7 +28,7 @@ contract OrganizerNFT is ERC721, AccessControl {
       address to,
       string memory _username,
       string memory _email,
-      uint   _phone_number
+      string memory _phone_number
     ) external onlyRole(MINTER_ROLE) returns (uint) {
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();

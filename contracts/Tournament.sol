@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.4;
 
 import "../contracts/interfaces/IERC20Token.sol";
+import "../contracts/structs/Player.sol";
 
     // We will organize a weekly tournament in 
     // which users can participate by using MNFT tokens.
@@ -47,14 +48,6 @@ contract Tournament {
     // The function claimPrize() already called.
     error ClaimPrizeAlreadyCalled();
 
-    // Initializing player of tournament.
-    struct Player {
-        address p_address;
-        string nickname;
-        uint life; // without life cannot play a web mini-game and get a score.
-        uint score; // can get a score by playing mini-game on web.
-    }
-
     constructor(
         address _mockToken,
         address _tournamentOwner,
@@ -73,7 +66,6 @@ contract Tournament {
     }
 
     modifier onlyPlayer() {
-        // playerId = addressToPlayerId[msg.sender];
         require(
             addressToPlayerId[msg.sender] != 0 &&
             addressJoined[msg.sender] == true
@@ -111,7 +103,6 @@ contract Tournament {
         playerIdToAddress[players.length] = msg.sender;
         addressToPlayerId[msg.sender] = players.length;
         registeredNickname[_nickname] = true;
-        // added to prevent multiple participation
         addressJoined[msg.sender] = true;
 
         emit NewPlayer(msg.sender, _nickname);
@@ -150,7 +141,6 @@ contract Tournament {
         players[playerId - 1].score += _score;
     }
 
-    // function claimPrize() public onlyOrganizer {
     function grantPrize() public onlyOrganizer {
         if(block.timestamp < tournamentEndTime)
             revert TournamentNotYetEnded();
