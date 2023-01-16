@@ -10,7 +10,7 @@ import "./interfaces/IOrganizerNFT.sol";
 contract TournamentFactory is AccessControl {
   mapping(address => uint[]) public addressToOrganizerTournamentIds;
   mapping(uint => address) public tournamentIdToAddress;
-  
+
   uint[] public tournaments;
   uint public tournamentId;
 
@@ -36,7 +36,7 @@ contract TournamentFactory is AccessControl {
     tournamentId = 1;
   }
 
-  function createEvent(
+  function createTournament(
     address _mockToken,
     address _tournamentOwner,
     uint _tournamentEndTime
