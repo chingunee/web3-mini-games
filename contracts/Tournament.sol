@@ -27,6 +27,9 @@ contract Tournament {
     
     mapping(string => bool) registeredNickname;
 
+    // added to prevent multiple participation
+    mapping(address => bool) public addressJoined;
+
     event PrizeIncreased(uint NewPrize);
 
     event PlayerScoreIncreased(address player, uint score);
@@ -70,10 +73,10 @@ contract Tournament {
     }
 
     modifier onlyPlayer() {
-        playerId = addressToPlayerId[msg.sender];
+        // playerId = addressToPlayerId[msg.sender];
         require(
             addressToPlayerId[msg.sender] != 0 &&
-            playerId <= players.length
+            addressJoined[msg.sender] == true
             , "Not registered address");
         _;
     }
@@ -82,7 +85,8 @@ contract Tournament {
         if(block.timestamp > tournamentEndTime)
             revert TournamentAlreadyEnded();
         require(
-            addressToPlayerId[msg.sender] == 0,
+            // addressToPlayerId[msg.sender] == 0,
+            addressJoined[msg.sender] == false,
             "Already registered address");
         require(
             amount >= 100,
@@ -107,6 +111,8 @@ contract Tournament {
         playerIdToAddress[players.length] = msg.sender;
         addressToPlayerId[msg.sender] = players.length;
         registeredNickname[_nickname] = true;
+        // added to prevent multiple participation
+        addressJoined[msg.sender] = true;
 
         emit NewPlayer(msg.sender, _nickname);
         emit PrizeIncreased(prize);
@@ -144,7 +150,8 @@ contract Tournament {
         players[playerId - 1].score += _score;
     }
 
-    function claimPrize() public onlyOrganizer {
+    // function claimPrize() public onlyOrganizer {
+    function grantPrize() public onlyOrganizer {
         if(block.timestamp < tournamentEndTime)
             revert TournamentNotYetEnded();
         
