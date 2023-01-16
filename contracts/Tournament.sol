@@ -1,20 +1,48 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
-import "../contracts/IERC20Token.sol";
 
-contract TournamentTest {
-    uint256 public prize;
+import "../contracts/interfaces/IERC20Token.sol";
+
+    // We will organize a weekly tournament in 
+    // which users can participate by using MNFT tokens.
+
+    // All tokens used for participation 
+    // will be added to the tournament prize pool.
+
+contract Tournament {
+    uint public prize;
+    uint public playerId;
+    uint public tournamentEndTime;
+
     address public organizer;
     address public mockToken;
 
-    Player[] public players;
+    bool ended; 
 
+    Player[] public players;
     IERC20Token public token;
 
-    constructor(address _mockToken) public {
-        token = IERC20Token(_mockToken);
-        organizer = msg.sender;
-    }
+    mapping(address => uint) public addressToPlayerId;
+    mapping(uint => address) public playerIdToAddress;
+    
+    mapping(string => bool) registeredNickname;
+
+    event PrizeIncreased(uint NewPrize);
+
+    event PlayerScoreIncreased(address player, uint score);
+    event PlayerLifeIncreased(address player, uint life);
+    event NewPlayer(address player, string name);
+
+    event TournamendEnded(address winner, uint amount);
+
+    // The tournament has already ended.
+    error TournamentAlreadyEnded();
+
+    // The tournament has not ended yet.
+    error TournamentNotYetEnded();
+
+    // The function claimPrize() already called.
+    error ClaimPrizeAlreadyCalled();
 
     // Initializing player of tournament.
     struct Player {
@@ -24,56 +52,107 @@ contract TournamentTest {
         uint score; // can get a score by playing mini-game on web.
     }
 
-    mapping(address => uint) public addressToPlayerId;
-    mapping(uint => address) public playerIdToAddress;
+    constructor(
+        address _mockToken,
+        address _tournamentOwner,
+        uint _tournamentEndTime
+        ) {
+        token = IERC20Token(_mockToken);
+        organizer = _tournamentOwner;
+        tournamentEndTime = block.timestamp + _tournamentEndTime;
+    }
 
-    event NewPlayer(address player, string name);
-    event PrizeIncreased(uint256 newPrize);
-    event PlayerScoreIncreased(address player, uint score);
-    event PlayerEliminated(address player);
+    modifier onlyOrganizer() {
+        require(
+            msg.sender == organizer, 
+            "Only organizer can claim the prize and transfer prize to the winner of the tournament.");
+        _;
+    }
 
-    // We will organize a weekly tournament in 
-    // which users can participate by using MNFT tokens.
-    // All tokens used for participation 
-    // will be added to the tournament prize pool. 
+    modifier onlyPlayer() {
+        playerId = addressToPlayerId[msg.sender];
+        require(
+            addressToPlayerId[msg.sender] != 0 &&
+            playerId <= players.length
+            , "Not registered address");
+        _;
+    }
 
     function participate(string memory _nickname, uint amount) external {
-        require(addressToPlayerId[msg.sender] == 0, "Already registered address");
-        require(amount > 0, "Must pay a fee to enter the tournament.");
-        bool sentFeeToPrize = token.transferFrom(msg.sender, organizer, amount);
-        require(sentFeeToPrize,"Prize transfer failed");
+        if(block.timestamp > tournamentEndTime)
+            revert TournamentAlreadyEnded();
+        require(
+            addressToPlayerId[msg.sender] == 0,
+            "Already registered address");
+        require(
+            amount >= 100,
+            "Must pay a MNFT to enter the tournament. 1 life == 100 MNFT");
+        require(
+            !registeredNickname[_nickname],
+            "Invalid nickname.");
+
+        bool sentFeeToPrize = token.transferFrom(msg.sender, address(this), amount);
+        require(
+            sentFeeToPrize,
+            "Prize transfer failed");
+
         prize += amount;
         players.push(Player({
                 life: amount /= 100, // You can get 1 life with 100 tokens.
-                score: 0,
+                score: 0,            
                 p_address: msg.sender,
                 nickname: _nickname
             }));
-        
+            
         playerIdToAddress[players.length] = msg.sender;
         addressToPlayerId[msg.sender] = players.length;
+        registeredNickname[_nickname] = true;
 
         emit NewPlayer(msg.sender, _nickname);
         emit PrizeIncreased(prize);
     }
 
-    function increasePrize(uint256 amount) public {
-        require(msg.sender == organizer, "Only the organizer can increase the prize.");
-        prize += amount;
-        emit PrizeIncreased(amount);
+    function buyLife(uint amount) public onlyPlayer {
+        bool sentTokenToLife = token.transferFrom(msg.sender, address(this), amount);
+        require(sentTokenToLife, "The transfer of buying a life has failed.");
+        amount /= 100;
+        if(sentTokenToLife) {
+            players[playerId - 1].life += amount;
+        }
+        emit PlayerLifeIncreased(msg.sender, amount);
     }
 
-    function addScore(uint _score) public {
-        require(_score >= 0, "Score cannot be negative");
-        require(addressToPlayerId[msg.sender] != 0, "Not registered address");
-        uint playerId = addressToPlayerId[msg.sender];
-        require(playerId <= players.length, "Player does not exist in the tournament");
+    function decreaseLife(uint amount) public onlyPlayer {
+        players[playerId - 1].life -= amount;
+    }
+
+    function increasePrize(uint amount) public onlyOrganizer {
+        bool increasedPrize = token.transferFrom(msg.sender, address(this), amount);
+        require(increasedPrize, "The transfer of increasing prize has failed.");
+        prize += amount;
+        emit PrizeIncreased(prize);
+    }
+
+    function addScore(uint _score) public onlyPlayer {
+        require(
+            _score >= 0, 
+            "Score cannot be negative");
+        require(
+            players[playerId - 1].life == 0,
+            "In order to add score your balance you have to play until your life zero");
+        
         players[playerId - 1].score += _score;
     }
 
-    function claimPrize() public {
-        require(msg.sender == organizer, "Only the organizer can transfer the prize.");
+    function claimPrize() public onlyOrganizer {
+        if(block.timestamp < tournamentEndTime)
+            revert TournamentNotYetEnded();
+        
+        if(ended) 
+            revert ClaimPrizeAlreadyCalled();
+
         require(prize > 0, "There is no prize");
+
         uint highestScore = 0;
         address highestScorer;
         
@@ -83,13 +162,14 @@ contract TournamentTest {
                 highestScorer = players[i].p_address;
             }
         }
+        ended = true;
+        emit TournamendEnded(highestScorer, prize);
 
-        uint prizeWon = prize / 2;
-        bool sentPlayerPrizeWon = token.transferFrom(organizer, highestScorer, prizeWon);
-        require(sentPlayerPrizeWon,"Prize won transfer failed");
-
+        bool sentPlayerPrizeWon = token.transfer(highestScorer, prize);
+        require(sentPlayerPrizeWon, "Prize won transfer failed");
+        
         if(sentPlayerPrizeWon) {
             prize = 0;
         }
-    }
+    }   
 }

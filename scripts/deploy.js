@@ -10,7 +10,7 @@ async function main() {
   console.log("scoreBoardContract deployed to:", scoreBoardContract.address);
 
   const content = {
-    scoreBoard: scoreBoardContract.address,
+    scoreBoard: tournamentContract.address,
   };
   createAddressJson(
     path.join(__dirname, "/../app/genAddresses.json"),
